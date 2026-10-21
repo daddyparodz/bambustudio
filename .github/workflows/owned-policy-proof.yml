@@ -1,0 +1,13 @@
+name: Owned policy prequeue proof
+on:
+  pull_request:
+    branches: [security-policy-proof-20261021-base]
+permissions: {}
+jobs:
+  trusted-noop:
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 1
+    steps:
+      - name: Trusted constant no-op
+        shell: bash
+        run: ":"
