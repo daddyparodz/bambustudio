@@ -157,3 +157,143 @@ jobs:
       series: ${{ inputs.series || '' }}
       retention_versions: ${{ inputs.retention_versions || 3 }}
     secrets: inherit
+
+
+  diagnose_launchpad_state:
+    name: diagnose Launchpad publication state
+    if: github.event_name == 'pull_request' && github.head_ref == 'ci/async-launchpad-verification'
+    runs-on: [self-hosted, linux, x64]
+    container:
+      image: ubuntu:24.04
+      env:
+        DEBIAN_FRONTEND: noninteractive
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Bootstrap diagnostic container
+        run: |
+          set -euxo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends python3 python3-launchpadlib
+          rm -rf /var/lib/apt/lists/*
+          python3 -c "from launchpadlib.launchpad import Launchpad"
+
+      - name: Read Launchpad publication state
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import json
+          import time
+          from collections import Counter, defaultdict
+
+          from launchpadlib.launchpad import Launchpad
+          from lazr.restfulclient.errors import ServerError
+
+          OWNER = "daddyparodz"
+          ARCHIVE = "bambustudio"
+          PACKAGES = ("bambustudio", "bambustudio-beta")
+
+          def retry_read(label, fn):
+              delays = (1, 2, 4)
+              for attempt in range(1, 5):
+                  try:
+                      return fn()
+                  except ServerError as exc:
+                      if attempt == 4:
+                          raise
+                      print(f"READ_RETRY label={label!r} attempt={attempt}/4 error={exc}")
+                      time.sleep(delays[attempt - 1])
+
+          def prop(obj, name, default=None):
+              return retry_read(name, lambda: getattr(obj, name, default))
+
+          def series_name(pub):
+              series = retry_read("publication distro_series", lambda: getattr(pub, "distro_series", None))
+              if series is None:
+                  return "unknown"
+              return str(
+                  retry_read("distro series name", lambda: getattr(series, "name", ""))
+                  or retry_read("distro series self_link", lambda: getattr(series, "self_link", ""))
+                  or "unknown"
+              )
+
+          lp = Launchpad.login_anonymously(
+              "bambustudio-ppa-readonly-diagnostic",
+              "production",
+              version="devel",
+          )
+          ppa = retry_read(
+              "PPA lookup",
+              lambda: lp.people[OWNER].getPPAByName(name=ARCHIVE),
+          )
+
+          aggregate = {
+              "packages": {},
+              "deleted_total": 0,
+              "deleted_with_schedule": 0,
+              "deleted_with_date_removed": 0,
+              "deleted_schedule_and_removed": 0,
+              "deleted_schedule_without_removed": 0,
+              "deleted_without_schedule": 0,
+              "published_total": 0,
+              "superseded_total": 0,
+          }
+
+          for pkg in PACKAGES:
+              pkg_summary = {}
+              for status in ("Published", "Superseded", "Deleted"):
+                  pubs = retry_read(
+                      f"{pkg} {status} collection",
+                      lambda pkg=pkg, status=status: list(
+                          ppa.getPublishedSources(
+                              source_name=pkg,
+                              exact_match=True,
+                              status=status,
+                              order_by_date=True,
+                          )
+                      ),
+                  )
+                  series_counts = Counter(series_name(pub) for pub in pubs)
+                  versions = [str(prop(pub, "source_package_version", "") or "") for pub in pubs]
+                  pkg_summary[status.lower()] = {
+                      "count": len(pubs),
+                      "by_series": dict(sorted(series_counts.items())),
+                      "versions": versions,
+                  }
+                  if status == "Published":
+                      aggregate["published_total"] += len(pubs)
+                  elif status == "Superseded":
+                      aggregate["superseded_total"] += len(pubs)
+                  else:
+                      aggregate["deleted_total"] += len(pubs)
+                      for pub in pubs:
+                          scheduled = prop(pub, "scheduled_deletion_date", None) or prop(pub, "scheduleddeletiondate", None)
+                          removed = prop(pub, "date_removed", None) or prop(pub, "dateremoved", None)
+                          made_pending = prop(pub, "date_made_pending", None) or prop(pub, "datemadepending", None)
+                          record = {
+                              "package": pkg,
+                              "series": series_name(pub),
+                              "version": str(prop(pub, "source_package_version", "") or ""),
+                              "status": str(prop(pub, "status", "") or ""),
+                              "scheduled_deletion_date": str(scheduled) if scheduled else None,
+                              "date_removed": str(removed) if removed else None,
+                              "date_made_pending": str(made_pending) if made_pending else None,
+                              "self_link": str(prop(pub, "self_link", "") or ""),
+                          }
+                          if scheduled:
+                              aggregate["deleted_with_schedule"] += 1
+                          else:
+                              aggregate["deleted_without_schedule"] += 1
+                          if removed:
+                              aggregate["deleted_with_date_removed"] += 1
+                          if scheduled and removed:
+                              aggregate["deleted_schedule_and_removed"] += 1
+                          if scheduled and not removed:
+                              aggregate["deleted_schedule_without_removed"] += 1
+                          print("DELETED_RECORD " + json.dumps(record, sort_keys=True))
+
+              aggregate["packages"][pkg] = pkg_summary
+
+          print("LAUNCHPAD_PUBLICATION_SUMMARY " + json.dumps(aggregate, sort_keys=True))
+          PY
