@@ -21,10 +21,11 @@ free for the impending upload, so only N-1 existing active versions are kept.
 When --reserve-series is supplied, that reservation applies only to those Ubuntu
 series; otherwise it applies to every series for the reserved package.
 Published and Superseded publications outside the retention window are
-explicitly scheduled for deletion. Deleted publication history is considered
-cleanup-pending while Launchpad exposes a scheduled deletion date for that
-publication; terminal Deleted history without a deletion schedule does not
-block later uploads.
+explicitly scheduled for deletion. Deleted publication history is considered cleanup-pending only while Launchpad
+exposes a scheduled deletion date and has not yet set date_removed. Once
+date_removed is set, Launchpad has removed the publication from the published
+set and that historical record no longer blocks later uploads. Deleted history
+without a deletion schedule is also non-blocking.
 
 Requires:
   - python3-launchpadlib installed
@@ -267,6 +268,13 @@ def scheduled_deletion(pub):
     )
 
 
+def removed_date(pub):
+    return (
+        getattr(pub, "date_removed", None)
+        or getattr(pub, "dateremoved", None)
+    )
+
+
 def get_published_sources(ppa, pkg, status):
     return retry_launchpad_read(
         f"{pkg} {status} source publications",
@@ -327,6 +335,16 @@ for pkg in packages:
             continue
         seen_deleted.add(key)
         scheduled = scheduled_deletion(pub)
+        removed = removed_date(pub)
+        if removed:
+            terminal_deleted += 1
+            if scheduled:
+                print(
+                    f"{pkg}/{series_name(pub)}: Launchpad archive deletion completed at "
+                    f"{removed} (scheduled at {scheduled}) for "
+                    f"{getattr(pub, 'source_package_version', '<unknown>')}"
+                )
+            continue
         if not scheduled:
             terminal_deleted += 1
             continue
