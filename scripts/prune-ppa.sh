@@ -33,7 +33,9 @@ Requires:
     0) LAUNCHPAD_CREDENTIALS (raw credential text)
     1) LAUNCHPAD_CREDENTIALS_FILE
     2) LAUNCHPAD_OAUTH_CREDENTIALS_FILE
-    3) common local credential paths (including /home/dak/bambustudio-launchpad-safe-keep)
+
+No implicit credential discovery is performed. For local use, set one of the
+file variables above to the exact path of an existing credential file.
 USAGE
   exit 2
 }
@@ -127,18 +129,7 @@ resolve_credentials_file() {
     return 0
   fi
 
-  local candidate
-  for candidate in \
-    "/home/dak/bambustudio-launchpad-safe-keep/launchpad.credentials" \
-    "/home/dak/bambustudio-launchpad-safe-keep/LAUNCHPAD_OAUTH_CREDENTIALS" \
-    "/home/dak/bambustudio-launchpad-safe-keep/LAUNCHPAD_OAUTH_CREDENTIALS.txt" \
-    "${HOME}/.cache/launchpadlib/credentials"; do
-    if [[ -f "$candidate" ]]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-
+  # Credentials must be supplied explicitly; never search local profiles.
   return 1
 }
 

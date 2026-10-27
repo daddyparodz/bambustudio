@@ -93,9 +93,9 @@ appimage_asset_url() {
   primary="$(preferred_asset_series "$series")"
   fallback="$(fallback_asset_series "$series")"
 
-  url="$(jq -r '.assets[]?.browser_download_url' <<<"$release_json" | grep -E "BambuStudio_ubuntu[-_]?${primary}-.*\\.AppImage$" | head -n1 || true)"
+  url="$(jq -r '.assets[]?.browser_download_url' <<<"$release_json" | grep -E "BambuStudio_(ubuntu[-_]?${primary}|ubu${primary%%.*})-.*\\.AppImage$" | head -n1 || true)"
   if [[ -z "$url" ]]; then
-    url="$(jq -r '.assets[]?.browser_download_url' <<<"$release_json" | grep -E "BambuStudio_ubuntu[-_]?${fallback}-.*\\.AppImage$" | head -n1 || true)"
+    url="$(jq -r '.assets[]?.browser_download_url' <<<"$release_json" | grep -E "BambuStudio_(ubuntu[-_]?${fallback}|ubu${fallback%%.*})-.*\\.AppImage$" | head -n1 || true)"
   fi
 
   if [[ -z "$url" ]]; then
