@@ -88,6 +88,10 @@ getent() { printf 'test:x:1234:1234::%s:/bin/bash\\n' "$TEST_SSH_HOME"; }
                         except (EOFError, paramiko.SSHException):
                             # Host rejection closes the handshake before authentication.
                             pass
+                        except ConnectionResetError as error:
+                            # OpenSSH may reset TCP when rejecting the replacement key.
+                            if pinned_key == server_key:
+                                errors.append(error)
                         except Exception as error:
                             errors.append(error)
 
