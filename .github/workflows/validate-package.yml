@@ -9,11 +9,13 @@ on:
       - '.github/workflows/**'
       - 'packaging/**'
       - 'scripts/**'
+      - 'tests/**'
   pull_request:
     paths:
       - '.github/workflows/**'
       - 'packaging/**'
       - 'scripts/**'
+      - 'tests/**'
 
 permissions:
   contents: read

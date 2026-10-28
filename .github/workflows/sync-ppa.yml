@@ -12,12 +12,14 @@ on:
       - '.github/workflows/sync-ppa-channel.yml'
       - 'packaging/**'
       - 'scripts/**'
+      - 'tests/**'
   pull_request:
     paths:
       - '.github/workflows/sync-ppa.yml'
       - '.github/workflows/sync-ppa-channel.yml'
       - 'packaging/**'
       - 'scripts/**'
+      - 'tests/**'
   workflow_dispatch:
     inputs:
       release_tag:
