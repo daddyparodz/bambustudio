@@ -11,6 +11,11 @@ MAX_RETRY_DELAY_SECONDS="${MAX_RETRY_DELAY_SECONDS:-300}"
 DPUT_TIMEOUT_SECONDS="${DPUT_TIMEOUT_SECONDS:-1200}"
 PPA_REVISION="${PPA_REVISION:-1}"
 SOURCE_INCLUDE_MODE="${SOURCE_INCLUDE_MODE:-auto}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ "${1:-}" == "--check-sftp" ]]; then
+  PPA_UPLOAD_METHOD=sftp
+fi
 
 if [[ $# -lt 1 ]]; then
   echo "Usage: $0 <source.changes> [<source.changes> ...]" >&2
@@ -30,20 +35,31 @@ setup_sftp_target() {
     login="$owner"
   fi
 
-  mkdir -p "$HOME/.ssh"
-  chmod 700 "$HOME/.ssh"
-  printf '%s\n' "$LAUNCHPAD_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_launchpad_upload"
-  chmod 600 "$HOME/.ssh/id_launchpad_upload"
-  cat > "$HOME/.ssh/config" <<EOF
+  # OpenSSH resolves ~ from the account database, not the HOME environment
+  # variable. They can differ in an Actions job, unlike dput's config lookup.
+  local ssh_home
+  ssh_home="$(getent passwd "$(id -u)" | cut -d: -f6)"
+  if [[ -z "$ssh_home" || "$ssh_home" != /* ]]; then
+    echo "Cannot resolve the OpenSSH account home directory" >&2
+    return 1
+  fi
+  mkdir -p "$ssh_home/.ssh"
+  chmod 700 "$ssh_home/.ssh"
+  printf '%s\n' "$LAUNCHPAD_SSH_PRIVATE_KEY" > "$ssh_home/.ssh/id_launchpad_upload"
+  chmod 600 "$ssh_home/.ssh/id_launchpad_upload"
+  install -m 600 "$SCRIPT_DIR/../packaging/launchpad_known_hosts" "$ssh_home/.ssh/known_hosts_launchpad"
+  cat > "$ssh_home/.ssh/config" <<EOF
 Host ppa.launchpad.net
   User ${login}
-  IdentityFile ~/.ssh/id_launchpad_upload
+  IdentityFile "${ssh_home}/.ssh/id_launchpad_upload"
   IdentitiesOnly yes
-  StrictHostKeyChecking accept-new
+  BatchMode yes
+  StrictHostKeyChecking yes
+  UserKnownHostsFile "${ssh_home}/.ssh/known_hosts_launchpad"
+  GlobalKnownHostsFile none
+  UpdateHostKeys no
 EOF
-  chmod 600 "$HOME/.ssh/config"
-  ssh-keyscan -H ppa.launchpad.net >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
-  chmod 600 "$HOME/.ssh/known_hosts"
+  chmod 600 "$ssh_home/.ssh/config"
 
   cat > "$HOME/.dput.cf" <<EOF
 [launchpad-sftp]
@@ -83,6 +99,13 @@ case "$PPA_UPLOAD_METHOD" in
     exit 1
     ;;
 esac
+
+if [[ "$1" == "--check-sftp" ]]; then
+  # Authenticate and negotiate SFTP without creating or uploading any files.
+  printf 'pwd\nquit\n' | sftp -b - -oConnectTimeout=30 ppa.launchpad.net
+  echo "Launchpad SFTP host verification and authentication succeeded."
+  exit 0
+fi
 
 for changes_file in "$@"; do
   echo "Pre-upload source check for ${changes_file}"

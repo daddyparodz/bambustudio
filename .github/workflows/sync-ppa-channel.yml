@@ -440,6 +440,18 @@ jobs:
           echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
           echo "LAUNCHPAD_GPG_FINGERPRINT=$LAUNCHPAD_GPG_FINGERPRINT" >> "$GITHUB_ENV"
 
+      - name: Verify Launchpad SFTP connection
+        if: github.event_name != 'pull_request'
+        env:
+          LAUNCHPAD_SSH_PRIVATE_KEY: ${{ secrets.LAUNCHPAD_SSH_PRIVATE_KEY }}
+          LAUNCHPAD_SFTP_LOGIN: daddyparodz
+        run: |
+          if [[ -n "$LAUNCHPAD_SSH_PRIVATE_KEY" ]]; then
+            bash ./scripts/upload-ppa.sh --check-sftp
+          else
+            echo "No Launchpad SSH key configured; retaining the selected upload transport."
+          fi
+
       - name: Build source packages
         if: >-
           steps.state.outputs.skip != 'true' &&
