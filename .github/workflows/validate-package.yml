@@ -93,6 +93,7 @@ jobs:
       - name: Run cleanup gate regression
         run: |
           python3 -m unittest discover -s tests -p 'test_cleanup_pending.py'
+          python3 -m unittest discover -s tests -p 'test_release_state_tracking.py'
 
       - name: Run SFTP host trust regression
         run: |

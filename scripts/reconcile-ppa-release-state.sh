@@ -67,12 +67,24 @@ for attempt in 1 2 3; do
     rm -f "$result"
   done
 
-  if [[ "$changed" != "true" ]] || git -C "$state_worktree" diff --quiet; then
+  if [[ "$changed" != "true" ]]; then
     [[ "$overall_failure" == "false" ]] || exit 1
     exit 0
   fi
 
-  git -C "$state_worktree" add state
+  git -C "$state_worktree" add -A -- state
+  # Failure manifests can also be ignored by release-state's *.json rule.
+  for channel in stable beta; do
+    if [[ -f "$state_worktree/state/failed-${channel}.json" ]]; then
+      git -C "$state_worktree" add -f -- "state/failed-${channel}.json"
+    fi
+  done
+
+  if git -C "$state_worktree" diff --cached --quiet; then
+    [[ "$overall_failure" == "false" ]] || exit 1
+    exit 0
+  fi
+
   git -C "$state_worktree" commit -m "chore: reconcile Launchpad release state"
   if git -C "$state_worktree" push origin HEAD:release-state; then
     [[ "$overall_failure" == "false" ]] || exit 1

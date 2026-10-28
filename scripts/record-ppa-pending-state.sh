@@ -43,7 +43,9 @@ for attempt in 1 2 3; do
   git -C "$state_worktree" reset --hard refs/remotes/origin/release-state
   cp "$MANIFEST" "$state_worktree/state/pending-${CHANNEL}.json"
   rm -f "$state_worktree/state/failed-${CHANNEL}.json"
-  git -C "$state_worktree" add state
+  git -C "$state_worktree" add -A -- state
+  # release-state may ignore *.json; stage the pending manifest explicitly.
+  git -C "$state_worktree" add -f -- "state/pending-${CHANNEL}.json"
 
   if git -C "$state_worktree" diff --cached --quiet; then
     echo "release-state already records this pending ${CHANNEL} release"
