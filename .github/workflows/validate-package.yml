@@ -88,6 +88,10 @@ jobs:
         run: |
           bash -n scripts/*.sh scripts/lib/*.sh
 
+      - name: Run cleanup gate regression
+        run: |
+          python3 -m unittest discover -s tests -p 'test_cleanup_pending.py'
+
       - name: Build source package
         run: |
           series="$(./scripts/list-ubuntu-series.sh | awk '{print $NF}')"
