@@ -92,6 +92,18 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -p 'test_cleanup_pending.py'
 
+      - name: Run SFTP host trust regression
+        run: |
+          python3 -m unittest discover -s tests -p 'test_upload_sftp.py'
+
+      - name: Verify Launchpad SFTP connection
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          LAUNCHPAD_SSH_PRIVATE_KEY: ${{ secrets.LAUNCHPAD_SSH_PRIVATE_KEY }}
+          LAUNCHPAD_SFTP_LOGIN: daddyparodz
+        run: |
+          bash ./scripts/upload-ppa.sh --check-sftp
+
       - name: Build source package
         run: |
           series="$(./scripts/list-ubuntu-series.sh | awk '{print $NF}')"
