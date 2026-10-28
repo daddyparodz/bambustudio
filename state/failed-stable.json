@@ -1,0 +1,46 @@
+{
+  "channel": "stable",
+  "checked_at": "2026-10-28T04:45:18Z",
+  "commit": "b1e0fe5dc35f921a6fa3bf6879ac8e1fe1aaedb6",
+  "created_at": "2026-10-28T00:55:44Z",
+  "message": "Launchpad builds did not complete for bambustudio stonking 02.08.02.61+stonking-0ppa1~26.10.1 within 7200s; states=['Uploading build']",
+  "package": "bambustudio",
+  "revision": 1,
+  "schema": 1,
+  "sources": [
+    {
+      "build_states": [
+        "Successfully built"
+      ],
+      "series": "jammy",
+      "source_status": "Published",
+      "version": "02.08.02.61+jammy-0ppa1~22.04.1"
+    },
+    {
+      "build_states": [
+        "Successfully built"
+      ],
+      "series": "noble",
+      "source_status": "Published",
+      "version": "02.08.02.61+noble-0ppa1~24.04.1"
+    },
+    {
+      "build_states": [
+        "Successfully built"
+      ],
+      "series": "resolute",
+      "source_status": "Published",
+      "version": "02.08.02.61+resolute-0ppa1~26.04.1"
+    },
+    {
+      "build_states": [
+        "Uploading build"
+      ],
+      "series": "stonking",
+      "source_status": "Published",
+      "version": "02.08.02.61+stonking-0ppa1~26.10.1"
+    }
+  ],
+  "status": "failed",
+  "tag": "v02.08.02.61"
+}
