@@ -119,7 +119,8 @@ jobs:
             --keep-versions "$RETENTION_VERSIONS" \
             --result-json "$result"
           jq . "$result"
-          echo "cleanup_pending=$(jq -er '.cleanup_pending' "$result")" >> "$GITHUB_OUTPUT"
+          cleanup_pending="$(jq -er '.cleanup_pending | if type == "boolean" then tostring else error("Expected boolean cleanup_pending") end' "$result")"
+          echo "cleanup_pending=$cleanup_pending" >> "$GITHUB_OUTPUT"
           echo "deletion_requests=$(jq -er '.deletion_requests' "$result")" >> "$GITHUB_OUTPUT"
           echo "pending_deleted=$(jq -er '.pending_deleted' "$result")" >> "$GITHUB_OUTPUT"
 
