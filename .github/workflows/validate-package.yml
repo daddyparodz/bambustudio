@@ -94,6 +94,7 @@ jobs:
         run: |
           python3 -m unittest discover -s tests -p 'test_cleanup_pending.py'
           python3 -m unittest discover -s tests -p 'test_release_state_tracking.py'
+          python3 -m unittest discover -s tests -p 'test_ppa_verification.py'
 
       - name: Run SFTP host trust regression
         run: |

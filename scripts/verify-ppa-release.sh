@@ -185,13 +185,21 @@ for expected in manifest["sources"]:
     if failed:
         failure_message = f"Launchpad build failure for {manifest['package']} {series} {version}: {failed}"
     elif not states or not all(state == "Successfully built" for state in states):
-        if age_seconds >= build_deadline:
+        # These are active post-build stages, not terminal build failures.
+        # Keep the release pending even after the generic build deadline.
+        postbuild_states = {"Uploading build", "Gathering build output"}
+        if age_seconds >= build_deadline and not any(
+            state in postbuild_states for state in states
+        ):
             failure_message = (
                 f"Launchpad builds did not complete for {manifest['package']} {series} {version} "
                 f"within {build_deadline}s; states={states or ['not visible yet']}"
             )
         else:
             any_pending = True
+    elif entry["source_status"] != "Published":
+        # Successful builds alone do not prove that the source is published.
+        any_pending = True
     source_states.append(entry)
 
 if failure_message:
