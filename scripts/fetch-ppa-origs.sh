@@ -76,8 +76,34 @@ import json
 import os
 import pathlib
 import time
-import urllib.parse
-import urllib.request
+import sys
+
+try:
+    import urllib.parse
+    import urllib.request
+except ImportError as exc:
+    # Preserve evidence from this interpreter before the ephemeral job is gone.
+    # Environment values may contain credentials; record presence, not contents.
+    stdlib_dir = os.path.dirname(os.__file__)
+    print("ORIG_RUNTIME_IMPORT_FAILURE " + json.dumps({
+        "missing_module": exc.name,
+        "executable": sys.executable,
+        "real_executable": os.path.realpath(sys.executable),
+        "version": sys.version,
+        "prefix": sys.prefix,
+        "base_prefix": sys.base_prefix,
+        "stdlib_dir": stdlib_dir,
+        "stdlib_quopri_exists": os.path.isfile(os.path.join(stdlib_dir, "quopri.py")),
+        "search_path_entries": len(sys.path),
+        "search_path_quopri_exists": any(
+            os.path.isfile(os.path.join(entry, "quopri.py")) for entry in sys.path
+        ),
+        "stdlib_dir_on_path": stdlib_dir in sys.path,
+        "pythonhome_set": bool(os.environ.get("PYTHONHOME")),
+        "pythonpath_set": bool(os.environ.get("PYTHONPATH")),
+        "series": os.environ.get("FETCH_PPA_SERIES", ""),
+    }, sort_keys=True), file=sys.stderr, flush=True)
+    raise
 
 package = os.environ["FETCH_PPA_PACKAGE"]
 upstream = os.environ["FETCH_PPA_UPSTREAM_VERSION"]

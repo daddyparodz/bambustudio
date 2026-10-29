@@ -158,5 +158,5 @@ jobs:
       ppa_revision: ${{ inputs.ppa_revision || '' }}
       upload: ${{ (github.event_name == 'workflow_dispatch' && inputs.upload) || (github.event_name != 'workflow_dispatch' && github.event_name != 'pull_request') }}
       series: ${{ inputs.series || '' }}
-      retention_versions: ${{ inputs.retention_versions || 3 }}
+      retention_versions: ${{ fromJSON(format('{0}', inputs.retention_versions || 3)) }}
     secrets: inherit
