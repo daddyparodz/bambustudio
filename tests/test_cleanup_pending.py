@@ -16,6 +16,15 @@ BASH = "C:/Program Files/Git/bin/bash.exe" if os.name == "nt" else "bash"
 
 
 class CleanupPendingTests(unittest.TestCase):
+    def test_reusable_retention_input_is_numeric(self):
+        workflow = WORKFLOWS[0].read_text(encoding="utf-8")
+        # Dispatch inputs can arrive as strings; reusable number inputs reject
+        # the value before any job starts unless it is explicitly converted.
+        self.assertIn(
+            "      retention_versions: ${{ fromJSON(format('{0}', inputs.retention_versions || 3)) }}",
+            workflow,
+        )
+
     def test_boolean_gates_under_errexit(self):
         cases = [
             ('{"cleanup_pending":false}', "false\n"),
