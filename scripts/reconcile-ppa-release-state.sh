@@ -24,11 +24,24 @@ for attempt in 1 2 3; do
   for channel in stable beta; do
     pending_rel="state/pending-${channel}.json"
     pending="$state_worktree/$pending_rel"
-    [[ -f "$pending" ]] || continue
+    recovering_failed=false
+    if [[ ! -f "$pending" ]]; then
+      pending="$state_worktree/state/failed-${channel}.json"
+      [[ -f "$pending" ]] || continue
+      recovering_failed=true
+    fi
 
     result="$(mktemp)"
     bash "$repo_root/scripts/verify-ppa-release.sh" --manifest "$pending" --result-json "$result"
     status="$(jq -r '.status' "$result")"
+    # A failed receipt is a durable HOLD. Only a fully verified success may
+    # change it; absence, retries in progress and query errors never reopen upload.
+    if [[ "$recovering_failed" == true && "$status" != success ]]; then
+      rm -f "$result"
+      overall_failure=true
+      echo "${channel}: retaining failed receipt (verification: ${status})" >&2
+      continue
+    fi
 
     case "$status" in
       pending)

@@ -98,6 +98,39 @@ class ReleaseStateTrackingTests(unittest.TestCase):
             )
             self.assertNotEqual(missing.returncode, 0)
 
+            # Repeated native reconciliation must retain the exact failed
+            # receipt, not turn a rebuilding/absent source into a new upload.
+            failed_sha = command(
+                "git", "--git-dir", bare, "rev-parse", "refs/heads/release-state",
+            ).stdout.strip()
+            for status in ("failed", "pending", "retryable"):
+                payload = {"status": status, "tag": "v01.00.00.00",
+                           "commit": "deadbeef", "revision": 1}
+                verifier.write_text(
+                    '#!/usr/bin/env bash\nset -euo pipefail\n'
+                    'while [[ $# -gt 0 ]]; do\n'
+                    '  if [[ "$1" == "--result-json" ]]; then result="$2"; break; fi\n'
+                    '  shift\ndone\n'
+                    f"printf '%s\\n' '{json.dumps(payload)}' > \"$result\"\n",
+                    encoding="utf-8",
+                )
+                held = command("bash", RECONCILE, cwd=worker, check=False)
+                self.assertEqual(held.returncode, 1, held.stderr)
+                self.assertEqual(command(
+                    "git", "--git-dir", bare, "rev-parse", "refs/heads/release-state",
+                ).stdout.strip(), failed_sha, status)
+
+            verifier.write_text(verifier.read_text().replace('"retryable"', '"success"'))
+            recovered = command("bash", RECONCILE, cwd=worker, check=False)
+            self.assertEqual(recovered.returncode, 0, recovered.stderr)
+            latest = command("git", "--git-dir", bare, "show",
+                             "release-state:state/latest-stable-tag.txt")
+            self.assertEqual(latest.stdout.strip(), "v01.00.00.00")
+            self.assertNotEqual(command(
+                "git", "--git-dir", bare, "cat-file", "-e",
+                "release-state:state/failed-stable.json", check=False,
+            ).returncode, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
