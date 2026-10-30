@@ -1,0 +1,28 @@
+{
+  "channel": "stable",
+  "commit": "781cd974c43aceb97a9a992da58508ff63e8ea8e",
+  "created_at": "2026-10-30T21:52:37Z",
+  "package": "bambustudio",
+  "revision": 4,
+  "schema": 1,
+  "sources": [
+    {
+      "series": "jammy",
+      "version": "02.08.02.61+jammy-0ppa4~22.04.1"
+    },
+    {
+      "series": "noble",
+      "version": "02.08.02.61+noble-0ppa4~24.04.1"
+    },
+    {
+      "series": "resolute",
+      "version": "02.08.02.61+resolute-0ppa4~26.04.1"
+    },
+    {
+      "series": "stonking",
+      "version": "02.08.02.61+stonking-0ppa4~26.10.1"
+    }
+  ],
+  "status": "pending",
+  "tag": "v02.08.02.61"
+}
