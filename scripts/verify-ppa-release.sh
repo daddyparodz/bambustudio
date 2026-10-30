@@ -62,8 +62,11 @@ required = ("channel", "package", "tag", "commit", "revision", "created_at", "so
 missing = [key for key in required if key not in manifest]
 if missing:
     raise SystemExit(f"Pending manifest missing fields: {missing}")
-if manifest.get("status") != "pending":
-    raise SystemExit(f"Expected pending manifest, got status={manifest.get('status')!r}")
+recovering_failed = manifest.get("status") == "failed"
+if manifest.get("status") not in {"pending", "failed"}:
+    raise SystemExit(f"Expected pending or failed manifest, got status={manifest.get('status')!r}")
+if recovering_failed and (type(manifest.get("schema")) is not int or manifest["schema"] != 1):
+    raise SystemExit("Unsupported failed receipt schema")
 if not isinstance(manifest["sources"], list) or not manifest["sources"]:
     raise SystemExit("Pending manifest has no sources")
 
@@ -179,6 +182,42 @@ for expected in manifest["sources"]:
         source_states.append(entry)
         continue
 
+    if recovering_failed:
+        # Legacy schema-1 receipts carry versions, not build IDs. Bind every
+        # live build to the exact publication returned for that immutable version.
+        archive_link = f"https://api.launchpad.net/devel/~{owner}/+archive/ubuntu/{archive_name}"
+        series_link = f"https://api.launchpad.net/devel/ubuntu/{series}"
+        def resource_value(resource, key):
+            # launchpadlib exposes linked resources without the REST _link
+            # suffix; raw captured GET objects retain that suffix.
+            value = getattr(resource, key, None)
+            if value is None and key.endswith("_link"):
+                value = getattr(getattr(resource, key[:-5], None), "self_link", "")
+            return str(value) if value is not None else ""
+
+        publication_link = str(getattr(publication, "self_link", ""))
+        identity = {
+            "source_package_name": manifest["package"],
+            "source_package_version": version,
+            "archive_link": archive_link,
+            "distro_series_link": series_link,
+        }
+        if (not publication_link.startswith(archive_link + "/+sourcepub/")
+                or not publication_link.rsplit("/", 1)[-1].isdigit()
+                or any(resource_value(publication, key) != value for key, value in identity.items())):
+            raise SystemExit("Failed receipt publication identity mismatch")
+        build_links = set()
+        for build in builds:
+            link = str(getattr(build, "self_link", ""))
+            if (not link.startswith(archive_link + "/+build/")
+                    or not link.rsplit("/", 1)[-1].isdigit()
+                    or link in build_links
+                    or getattr(build, "arch_tag", None) != "amd64"
+                    or resource_value(build, "current_source_publication_link") != publication_link
+                    or any(resource_value(build, key) != value for key, value in identity.items())):
+                raise SystemExit("Failed receipt build identity mismatch")
+            build_links.add(link)
+
     states = sorted(str(build.buildstate) for build in builds)
     entry["build_states"] = states
     failed = [state for state in states if state in failure_states]
@@ -200,6 +239,27 @@ for expected in manifest["sources"]:
     elif entry["source_status"] != "Published":
         # Successful builds alone do not prove that the source is published.
         any_pending = True
+    elif recovering_failed:
+        try:
+            binaries = list(ppa.getPublishedBinaries(
+                binary_name=manifest["package"], exact_match=True,
+                version=version, status="Published",
+            ))
+            matching_builds = {
+                resource_value(binary, "build_link") for binary in binaries
+                if (str(getattr(binary, "status", "")) == "Published"
+                    and str(getattr(binary, "binary_package_name", "")) == manifest["package"]
+                    and str(getattr(binary, "binary_package_version", "")) == version
+                    and str(getattr(binary, "source_package_name", "")) == manifest["package"]
+                    and str(getattr(binary, "source_package_version", "")) == version
+                    and resource_value(binary, "archive_link") == archive_link
+                    and resource_value(binary, "distro_arch_series_link") == series_link + "/amd64")
+            }
+            if not build_links or not build_links.issubset(matching_builds):
+                any_pending = True
+        except Exception:
+            # No binary proof (including a schema/API error) can clear a HOLD.
+            any_pending = True
     source_states.append(entry)
 
 if failure_message:

@@ -92,6 +92,8 @@ jobs:
 
       - name: Run cleanup gate regression
         run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p 'test_failed_receipt_recovery.py'
           python3 -m unittest discover -s tests -p 'test_cleanup_pending.py'
           python3 -m unittest discover -s tests -p 'test_release_state_tracking.py'
           python3 -m unittest discover -s tests -p 'test_ppa_verification.py'
